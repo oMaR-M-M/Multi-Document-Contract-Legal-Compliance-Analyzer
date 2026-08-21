@@ -6,10 +6,8 @@ from fastapi import FastAPI, File, UploadFile
 from pypdf import PdfReader
 from schemas import Payload, Document, Page
 
-app = FastAPI()
-
 def normalize_text(raw_text: str) -> str:
-    text = re.sub(r"[ \t]+", " ", raw_text)
+    text = re.sub(r"[ \t]+", " ", raw_text) 
     text = re.sub(r"\n\s*\n+", "\n", text)
     text = "\n".join(line.strip() for line in text.splitlines())
     return text.strip()
@@ -62,21 +60,14 @@ async def process_pdf(file: UploadFile) -> Document:
         pages=pages,
     )
 
-async def build_payload(files: list[UploadFile]) -> Payload:
+async def build_payload(files: list[UploadFile], prompt: str) -> Payload:
     documents = []
     for file in files:
         document = await process_pdf(file)
         documents.append(document)
 
     payload = Payload(
-        documents=documents
+        documents=documents,
+        prompt=prompt
     )
     return payload
-
-@app.post("/upload")
-async def upload_documents(files: list[UploadFile] = File(...)):
-
-    payload = await build_payload(files)
-
-    return payload.model_dump(mode="json")
-
