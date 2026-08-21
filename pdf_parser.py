@@ -1,8 +1,7 @@
 import re
-import unicodedata
 from io import BytesIO
 from pathlib import Path
-from fastapi import FastAPI, File, UploadFile
+from fastapi import UploadFile
 from pypdf import PdfReader
 from schemas import Payload, Document, Page
 
@@ -21,30 +20,19 @@ def get_document_type(filename: str) -> str:
 
     if "privacy" in name:
         return "privacy_policy"
-
     if "terms" in name or "tos" in name:
         return "terms_of_service"
-
     if "nda" in name:
         return "nda"
-
     return "unknown"
 
-
 async def process_pdf(file: UploadFile) -> Document:
-
     pdf_bytes = await file.read()
-
     reader = PdfReader(BytesIO(pdf_bytes))
-
     pages = []
-
     for page_number, pdf_page in enumerate(reader.pages,start=1):
-
         extracted_text = pdf_page.extract_text() or ""
-
         normalized_text = normalize_text(extracted_text)
-
         pages.append(
             Page(
                 page_number=page_number,
@@ -68,6 +56,6 @@ async def build_payload(files: list[UploadFile], prompt: str) -> Payload:
 
     payload = Payload(
         documents=documents,
-        prompt=prompt
+        prompt=prompt 
     )
     return payload
