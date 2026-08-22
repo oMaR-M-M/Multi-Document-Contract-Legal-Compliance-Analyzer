@@ -1,6 +1,6 @@
 // hena el url w el API key
 const CONFIG = {
-    API_BASE_URL: 'http://localhost:8000',
+    API_BASE_URL: 'http://localhost:5500',
     MAX_FILES: 4,
     MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
     ALLOWED_TYPES: ['application/pdf'],
@@ -14,6 +14,9 @@ let uploadedFiles = [];
 let analysisResults = null;
 let isProcessing = false;
 
+// NEW: conversation history (memory)
+let chatHistory = [];
+
 // el elements mn el page nafsha
 
 const fileInput = document.getElementById('fileInput');
@@ -23,6 +26,8 @@ const clearBtn = document.getElementById('clearBtn');
 const fileList = document.getElementById('fileList');
 const resultsDiv = document.getElementById('results');
 const statusDiv = document.getElementById('status');
+const promptInput = document.getElementById('promptInput');
+const askBtn = document.getElementById('askBtn');
 
 // koloh tamam fe el files? b validate
 
@@ -95,10 +100,12 @@ function clearAllFiles() {
     uploadedFiles = [];
     analysisResults = null;
     fileInput.value = '';
+    // optionally clear chat history too
+    chatHistory = [];
     renderFileList();
     updateUI();
     resultsDiv.innerHTML = '';
-    showStatus('All files cleared', 'info');
+    showStatus('All files and chat history cleared', 'info');
 }
 
 // elly be7ot el files
@@ -191,6 +198,10 @@ function updateUI() {
     clearBtn.style.display = uploadedFiles.length > 0 ? 'inline-block' : 'none';
     uploadBtn.disabled = uploadedFiles.length >= CONFIG.MAX_FILES;
     uploadBtn.textContent = uploadedFiles.length >= CONFIG.MAX_FILES ? '📁 Max Files Reached' : '📁 Browse Files';
+    // disable ask button while processing
+    if (askBtn) {
+        askBtn.disabled = isProcessing;
+    }
 }
 
 function showStatus(message, type = 'info') {
@@ -224,6 +235,75 @@ function showStatus(message, type = 'info') {
     }
 }
 
+// NEW: helper to add messages to chat history
+function addToHistory(role, content) {
+    chatHistory.push({ role, content });
+    // Optional: save to localStorage to survive page refresh
+    // localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+}
+
+// NEW: function to send prompt only (no files) with memory
+async function sendPromptOnly() {
+    const userPrompt = promptInput.value.trim();
+    if (!userPrompt) {
+        showStatus('Please enter a question or prompt', 'error');
+        return;
+    }
+
+    // Add user message to history
+    addToHistory('user', userPrompt);
+
+    isProcessing = true;
+    updateUI();
+    resultsDiv.innerHTML = '<p style="text-align: center;">⏳ Processing your question...</p>';
+    showStatus('Processing question...', 'info');
+
+    try {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/ask`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                prompt: userPrompt,
+                history: chatHistory,  // send entire conversation
+                llm_api_key: CONFIG.LLM_API_KEY !== 'YOUR_LLM_API_KEY_HERE' ? CONFIG.LLM_API_KEY : null
+            })
+        });
+
+        if (!response.ok) {
+            let errorMessage = `Server error: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.detail) errorMessage = errorData.detail;
+            } catch (e) {}
+            throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+
+        // Add assistant response to history
+        const assistantMessage = data.response || data.compliance_alerts?.[0]?.description || 'No specific response';
+        addToHistory('assistant', assistantMessage);
+
+        // Display the response (reuse renderResults if compatible)
+        renderResults(data);
+        showStatus('✅ Question answered!', 'success');
+    } catch (error) {
+        console.error('Error:', error);
+        showStatus(`❌ Error: ${error.message}`, 'error');
+        resultsDiv.innerHTML = `
+            <div style="padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; color: #721c24;">
+                <h4>❌ Error</h4>
+                <p>${error.message}</p>
+            </div>
+        `;
+    } finally {
+        isProcessing = false;
+        updateUI();
+    }
+}
+
 // API comms
 
 async function analyzeDocuments() {
@@ -253,12 +333,28 @@ async function analyzeDocuments() {
             }
         });
         
+        // NEW: add user prompt if provided
+        const userPrompt = promptInput.value.trim();
+        if (userPrompt) {
+            formData.append('user_prompt', userPrompt);
+            // also add to history
+            addToHistory('user', userPrompt);
+        } else {
+            // If no prompt, add a default
+            addToHistory('user', 'Analyze these documents for compliance');
+        }
+        
+        // NEW: send chat history as JSON string
+        if (chatHistory.length > 0) {
+            formData.append('chat_history', JSON.stringify(chatHistory));
+        }
+        
         // 70t el API key
         if (CONFIG.LLM_API_KEY && CONFIG.LLM_API_KEY !== 'YOUR_LLM_API_KEY_HERE') {
             formData.append('llm_api_key', CONFIG.LLM_API_KEY);
         }
         
-        const response = await fetch(`${CONFIG.API_BASE_URL}/api/analyze`, {
+        const response = await fetch(`${CONFIG.API_BASE_URL}/analyze`, {
             method: 'POST',
             body: formData
         });
@@ -298,6 +394,12 @@ async function analyzeDocuments() {
         analysisResults = data;
         renderResults(data);
         showStatus('✅ Analysis complete!', 'success');
+
+        // NEW: add assistant response to history
+        const summary = data.compliance_alerts.length 
+            ? `Found ${data.compliance_alerts.length} issues.` 
+            : 'No compliance issues found.';
+        addToHistory('assistant', summary);
         
     } catch (error) {
         console.error('Analysis error:', error);
@@ -327,7 +429,7 @@ async function checkHealth() {
             return false;
         }
     } catch (error) {
-        showStatus('❌ Cannot connect to backend server. Make sure it\'s running on port 8000', 'error');
+        showStatus('❌ Cannot connect to backend server. Make sure it\'s running on port 5500', 'error');
         console.error('Health check error:', error);
         return false;
     }
@@ -357,6 +459,11 @@ analyzeBtn.addEventListener('click', analyzeDocuments);
 
 // clear button
 clearBtn.addEventListener('click', clearAllFiles);
+
+// NEW: ask button event listener
+if (askBtn) {
+    askBtn.addEventListener('click', sendPromptOnly);
+}
 
 // drag and drop support
 const dropZone = document.getElementById('dropZone');
@@ -420,3 +527,5 @@ if (document.readyState === 'loading') {
 window.removeFile = removeFile;
 window.analyzeDocuments = analyzeDocuments;
 window.clearAllFiles = clearAllFiles;
+// NEW: expose sendPromptOnly globally
+window.sendPromptOnly = sendPromptOnly;
