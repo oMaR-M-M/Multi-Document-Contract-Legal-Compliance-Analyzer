@@ -309,11 +309,11 @@ report = analyse(query="What about the NDA?", files=Payload(documents=[]))
 
 This project was built by a team of four.
 
-| | Name | Role | Contribution | Links |
-|---|---|---|---|---|
-| <img src="https://via.placeholder.com/80" width="80" /> | **[Name]** | AI / ML Engineer | RAG pipeline, multi-hop retrieval, LLM reasoning & prompt engineering | [GitHub](#) · [LinkedIn](#) |
-| <img src="https://via.placeholder.com/80" width="80" /> | **[Name]** | Back-End Developer | API layer, session handling, document ingestion endpoints | [GitHub](#) · [LinkedIn](#) |
-| <img src="https://via.placeholder.com/80" width="80" /> | **[Name]** | Front-End Developer | UI, report visualization, document upload flow | [GitHub](#) · [LinkedIn](#) |
-| <img src="https://via.placeholder.com/80" width="80" /> | **[Name]** | [Role] | [Contribution] | [GitHub](#) · [LinkedIn](#) |
+| Name | Role | Contribution | Links |
+|---|---|---|---|
+| **Omar Mohamed** | AI / ML | RAG pipeline, multi-hop retrieval, LLM reasoning & prompt engineering | [@oMaR-M-M](https://github.com/oMaR-M-M) |
+| **Omar Karam** | Front-End & Back-End | API layer, session handling, document ingestion endpoints | [@8-Omoshikiii-8](https://github.com/8-Omoshikiii-8) |
+| **Omar shokry** | Back-End | [Contribution] | [@Omar-Mohamed-2006](https://github.com/Omar-Mohamed-2006) |
+| **Abdullah Sami** | Front-End | [Contribution] | [Alex-RavenHolm](https://github.com/Alex-RavenHolm) |
 
 ---
