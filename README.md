@@ -257,7 +257,7 @@ GROQ_API_KEY=your_groq_api_key_here
 MODEL_NAME=openai/gpt-oss-20b
 ```
 
-Run the demo:
+Run the demo(Test AI):
 
 ```bash
 cd ai_service
