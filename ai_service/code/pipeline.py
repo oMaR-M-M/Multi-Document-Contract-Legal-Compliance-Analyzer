@@ -80,7 +80,7 @@ def analyse(query: str, files: Payload):
         evidence = []
         target_req_texts = []
         
-        retrieved_reqs, req_scores = search(query_embedded, index_req, all_req_chunks, top_k=2)
+        retrieved_reqs, req_scores = search(query_embedded, index_req, all_req_chunks, top_k=4)
         
         unique_req_texts = list(set([rc.text for rc in retrieved_reqs]))
         
@@ -89,7 +89,7 @@ def analyse(query: str, files: Payload):
             req_text_embedded = embedding_query(req_text).astype("float32")
             faiss.normalize_L2(req_text_embedded.reshape(1, -1))
             
-            retrieved_docs, doc_scores = search(req_text_embedded, index_doc, filtered_doc_chunks, top_k=3)
+            retrieved_docs, doc_scores = search(req_text_embedded, index_doc, filtered_doc_chunks, top_k=5)
             
             for rc, s in zip(retrieved_docs, doc_scores):
                 if not any(e.text == rc.text for e in evidence):
