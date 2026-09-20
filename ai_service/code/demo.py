@@ -1,13 +1,3 @@
-"""
-Standalone smoke-test for the AI pipeline, independent of the API.
-
-Run from the PROJECT ROOT (not from inside ai_service/code/):
-    python -m ai_service.code.demo
-
-Expects a payload.json file next to this script with a JSON object
-matching the shared.schemas.Payload shape:
-    {"prompt": "...", "documents": [...]}
-"""
 import json
 import os
 
