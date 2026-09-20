@@ -123,7 +123,7 @@ flowchart TD
     I --> K{"🤔 is_requirement_check?"}
     J --> K
 
-    K -->|✅ True| L["🔗 PATH A: MULTI-HOP<br/>─────────────────<br/>1️⃣ Query → index_req (Hop 1, top-2)<br/>2️⃣ Deduplicate unique reqs<br/>3️⃣ Embed requirement text<br/>4️⃣ Req → index_doc (Hop 2, top-3)"]
+    K -->|✅ True| L["🔗 PATH A: MULTI-HOP<br/>─────────────────<br/>1️⃣ Query → index_req (Hop 1, top-4)<br/>2️⃣ Deduplicate unique reqs<br/>3️⃣ Embed requirement text<br/>4️⃣ Req → index_doc (Hop 2, top-5)"]
     K -->|❌ False| M["➡️ PATH B: DIRECT SEARCH<br/>─────────────────<br/>1️⃣ Query → index_doc<br/>2️⃣ Retrieve top-5 evidence"]
 
     L --> N["🧠 REASONING & FACT-CHECKING ENGINE<br/>─────────────────<br/>Evidence + Requirements + Chat Memory"]
