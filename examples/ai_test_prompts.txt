@@ -1,0 +1,7 @@
+Does the Vendor NDA's confidentiality survival period and breach notification timeline comply with our compliance requirements?
+
+Does the Privacy Policy meet our requirements for data retention and international data transfers?
+
+Is the Vendor NDA's definition of Confidential Information broad enough to meet our internal standard?
+
+Does the Terms of Service properly reference and align with the Privacy Policy regarding data handling?
