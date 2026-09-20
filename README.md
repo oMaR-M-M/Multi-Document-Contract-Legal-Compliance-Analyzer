@@ -301,7 +301,6 @@ class ComplianceReport(BaseModel):
 
 ```
 ai_service/
-├── 🔧 config.py        # Env vars, LLM + embedding model init, constants
 ├── 📐 schemas.py       # Pydantic models for all data structures
 ├── ✂️  chunking.py      # Document → Chunk conversion (two strategies)
 ├── 🧬 embeddings.py    # Text → vector encoding
