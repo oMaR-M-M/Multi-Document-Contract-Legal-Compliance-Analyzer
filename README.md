@@ -27,7 +27,7 @@
 
 ### 📑 Table of Contents
 
-[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Running the Project**](#-4-running-the-project) • [**5. Front-End**](#-5-front-end) • [**6. Contributors**](#-6-contributors)
+[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Front-End**](#-5-front-end) • [**5. Running the Project**](#-4-running-the-project) • [**6. Contributors**](#-6-contributors)
 
 </div>
 
@@ -453,7 +453,42 @@ The backend only accepts requests from `http://127.0.0.1:5500` by default — th
 
 ---
 
-## 🚀 4. Running the Project
+## 🎨 4. Front-End
+
+> **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
+
+### 🖥️ What It Looks Like
+
+A two-pane layout:
+
+| Pane | Contents |
+|:---|:---|
+| 📂 **Sidebar** | Drag-and-drop (or click-to-browse) PDF upload, file list with size + status badges, "Clear all" |
+| 💬 **Main thread** | A chat-style conversation — your questions on one side, rendered compliance report cards on the other |
+
+### ✨ Features
+
+- 🌗 **Dark / light theme toggle** — preference saved to `localStorage`, defaults to the OS's `prefers-color-scheme`
+- 📁 **Client-side upload guards** — PDF-only, max **4 files**, max **10 MB** each, duplicate-name detection
+- 💚 **Live backend health pill** — pings `GET /` on load so you immediately know if the backend isn't running
+- 📊 **Structured report rendering** — each finding renders as its own card with colored pills for status (🟢🟡🔴⚪) and severity (🔴🟡🟢), the quoted evidence, the analysis, and the recommendation
+- 🔁 **Chat-like continuity** — every message re-sends all currently uploaded files alongside the new prompt, so you never have to re-pick files to ask a follow-up question
+
+### 🔌 Connecting to the Backend
+
+```js
+const CONFIG = {
+  API_BASE_URL: "http://127.0.0.1:8000",
+  MAX_FILES: 4,
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+};
+```
+
+Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
+
+---
+
+## 🚀 5. Running the Project
 
 > Everything you need to get the backend and frontend running together, in order.
 
@@ -491,41 +526,6 @@ In the browser: upload up to 4 PDFs (keep `privacy`, `terms`/`tos`, `nda`, or `c
 
 </td></tr>
 </table>
-
----
-
-## 🎨 5. Front-End
-
-> **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
-
-### 🖥️ What It Looks Like
-
-A two-pane layout:
-
-| Pane | Contents |
-|:---|:---|
-| 📂 **Sidebar** | Drag-and-drop (or click-to-browse) PDF upload, file list with size + status badges, "Clear all" |
-| 💬 **Main thread** | A chat-style conversation — your questions on one side, rendered compliance report cards on the other |
-
-### ✨ Features
-
-- 🌗 **Dark / light theme toggle** — preference saved to `localStorage`, defaults to the OS's `prefers-color-scheme`
-- 📁 **Client-side upload guards** — PDF-only, max **4 files**, max **10 MB** each, duplicate-name detection
-- 💚 **Live backend health pill** — pings `GET /` on load so you immediately know if the backend isn't running
-- 📊 **Structured report rendering** — each finding renders as its own card with colored pills for status (🟢🟡🔴⚪) and severity (🔴🟡🟢), the quoted evidence, the analysis, and the recommendation
-- 🔁 **Chat-like continuity** — every message re-sends all currently uploaded files alongside the new prompt, so you never have to re-pick files to ask a follow-up question
-
-### 🔌 Connecting to the Backend
-
-```js
-const CONFIG = {
-  API_BASE_URL: "http://127.0.0.1:8000",
-  MAX_FILES: 4,
-  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-};
-```
-
-Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
 
 ---
 
