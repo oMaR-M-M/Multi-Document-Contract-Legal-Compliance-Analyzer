@@ -27,7 +27,7 @@
 
 ### 📑 Table of Contents
 
-[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Running the Project**](#-4-running-the-project) • [**5. Front-End**](#-5-front-end) • [**6. Contributors**](#-6-contributors)
+[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Front-End**](#-4-front-end) • [**5. Running the Project**](#-5-running-the-project) • [**6. Contributors**](#-6-contributors)
 
 </div>
 
@@ -262,7 +262,7 @@ Output is constrained through LangChain's `with_structured_output(ComplianceRepo
 
 ---
 
-### 📐 Data Schemas `shared/schemas.py`
+### 📐 Data Schemas `schemas.py`
 
 ```python
 class Finding(BaseModel):
@@ -300,29 +300,16 @@ class ComplianceReport(BaseModel):
 ### 📁 Project Structure
 
 ```
-Multi-Document-Contract-Legal-Compliance-Analyzer/
-├── 🧠 ai_service/
-│   ├── __init__.py
-│   └── code/
-│       ├── config.py        # Env vars, LLM + embedding model init, constants
-│       ├── chunking.py      # Document → Chunk conversion (two strategies)
-│       ├── embeddings.py    # Text → vector encoding
-│       ├── retriever.py     # FAISS similarity search
-│       ├── reasoning.py     # Query routing + LLM reasoning + prompts
-│       ├── pipeline.py      # analyse() — orchestrates the full flow
-│       └── demo.py          # Standalone smoke-test for the AI pipeline
-├── ⚡ backend/
-│   ├── main.py              # FastAPI app — GET / and POST /analyze
-│   └── pdf_parser.py        # PDF → Document conversion, type inference
-├── 🎨 frontend/
-│   ├── index.html           # VerifAi chat UI markup
-│   ├── app.js                # Upload handling, API calls, report rendering
-│   └── styles.css            # Dark/light theme styling
-├── 📐 shared/
-│   └── schemas.py           # Single source of truth for every Pydantic model
-├── 📦 examples/              # Sample PDFs for testing (NDA, privacy policy, ToS, requirements)
-├── 📄 requirements.txt
-└── 📄 README.md
+ai_service/
+├── 🔧 config.py        # Env vars, LLM + embedding model init, constants
+├── 📐 schemas.py       # Pydantic models for all data structures
+├── ✂️  chunking.py      # Document → Chunk conversion (two strategies)
+├── 🧬 embeddings.py    # Text → vector encoding
+├── 🔍 retriever.py     # FAISS similarity search
+├── 🧠 reasoning.py     # Query routing + LLM reasoning + prompts
+├── ⚙️  pipeline.py      # analyse() — orchestrates the full flow
+├── 🧪 demo.py          # Local test runner
+└── 📦 payload.json     # Sample input documents
 ```
 
 ---
@@ -337,38 +324,45 @@ Multi-Document-Contract-Legal-Compliance-Analyzer/
 | 🗂️ **Vector Store** | FAISS `IndexFlatIP` *(cosine similarity)* |
 | 🛡️ **Validation** | Pydantic |
 | ✂️ **Chunking** | LangChain `RecursiveCharacterTextSplitter` |
-| ⚡ **API** | FastAPI + Uvicorn |
-| 🎨 **Frontend** | Vanilla HTML / CSS / JavaScript |
 
 ---
 
-### 🚀 Testing the AI Service Directly
+### 🚀 Setup
 
-`demo.py` uses relative imports (`from .pipeline import analyse`), so it must be run as a **module**, from the **project root** — not as a plain script from inside `ai_service/code/`:
+**1️⃣ Install dependencies**
 
 ```bash
-python -m ai_service.code.demo
+pip install -r requirements.txt
 ```
 
-> ⚠️ Running `cd ai_service/code && python demo.py` will fail with `ModuleNotFoundError: No module named 'shared'` — the relative import needs the full package context that only exists when Python is launched from the project root.
+**2️⃣ Create a `.env` file in the project root**
 
-This expects a `payload.json` file next to `demo.py` matching the `shared.schemas.Payload` shape: `{"prompt": "...", "documents": [...]}`. You can build one from the sample PDFs in `examples/` by running them through `backend/pdf_parser.py`, or test the full flow through the actual API instead (see [Section 4](#-4-running-the-project)).
+```env
+GROQ_API_KEY=your_groq_api_key_here
+MODEL_NAME=openai/gpt-oss-20b
+```
+
+**3️⃣ Run the demo** *(Test AI)*
+
+```bash
+cd ai_service
+python demo.py
+```
 
 ---
 
 ### 💻 Usage
 
 ```python
-from shared.schemas import Payload
-from ai_service.code.pipeline import analyse, refrech
-```
+from schemas import Payload
+from pipeline import analyse, refrech
 
-> ⚠️ Run this from the **project root**, not from inside `ai_service/code/` — `shared` and `ai_service` must both be importable as top-level packages.
+payload = Payload(**your_documents_dict)
 
-```python
-payload = Payload(prompt="Does the Privacy Policy comply with our encryption requirements?", documents=[...])
-
-report = analyse(query=payload.prompt, files=payload)
+report = analyse(
+    query="Does the Privacy Policy comply with our encryption requirements?",
+    files=payload
+)
 
 print(report.status)    # ComplianceStatus.NON_COMPLIANT
 print(report.summary)
@@ -379,10 +373,10 @@ for finding in report.findings:
 refrech()  # 🔄 clear session state
 ```
 
-> 💡 **Follow-up questions:** the AI service always requires a `Payload` with a `prompt`, but `documents` can be empty — previously indexed content is reused.
+> 💡 **Follow-up questions:** send an empty document list — previously indexed content is reused.
 >
 > ```python
-> report = analyse(query="What about the NDA?", files=Payload(prompt="What about the NDA?", documents=[]))
+> report = analyse(query="What about the NDA?", files=Payload(documents=[]))
 > ```
 
 ---
@@ -459,7 +453,42 @@ The backend only accepts requests from `http://127.0.0.1:5500` by default — th
 
 ---
 
-## 🚀 4. Running the Project
+## 🎨 4. Front-End
+
+> **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
+
+### 🖥️ What It Looks Like
+
+A two-pane layout:
+
+| Pane | Contents |
+|:---|:---|
+| 📂 **Sidebar** | Drag-and-drop (or click-to-browse) PDF upload, file list with size + status badges, "Clear all" |
+| 💬 **Main thread** | A chat-style conversation — your questions on one side, rendered compliance report cards on the other |
+
+### ✨ Features
+
+- 🌗 **Dark / light theme toggle** — preference saved to `localStorage`, defaults to the OS's `prefers-color-scheme`
+- 📁 **Client-side upload guards** — PDF-only, max **4 files**, max **10 MB** each, duplicate-name detection
+- 💚 **Live backend health pill** — pings `GET /` on load so you immediately know if the backend isn't running
+- 📊 **Structured report rendering** — each finding renders as its own card with colored pills for status (🟢🟡🔴⚪) and severity (🔴🟡🟢), the quoted evidence, the analysis, and the recommendation
+- 🔁 **Chat-like continuity** — every message re-sends all currently uploaded files alongside the new prompt, so you never have to re-pick files to ask a follow-up question
+
+### 🔌 Connecting to the Backend
+
+```js
+const CONFIG = {
+  API_BASE_URL: "http://127.0.0.1:8000",
+  MAX_FILES: 4,
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+};
+```
+
+Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
+
+---
+
+## 🚀 5. Running the Project
 
 > Everything you need to get the backend and frontend running together, in order.
 
@@ -497,41 +526,6 @@ In the browser: upload up to 4 PDFs (keep `privacy`, `terms`/`tos`, `nda`, or `c
 
 </td></tr>
 </table>
-
----
-
-## 🎨 5. Front-End
-
-> **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
-
-### 🖥️ What It Looks Like
-
-A two-pane layout:
-
-| Pane | Contents |
-|:---|:---|
-| 📂 **Sidebar** | Drag-and-drop (or click-to-browse) PDF upload, file list with size + status badges, "Clear all" |
-| 💬 **Main thread** | A chat-style conversation — your questions on one side, rendered compliance report cards on the other |
-
-### ✨ Features
-
-- 🌗 **Dark / light theme toggle** — preference saved to `localStorage`, defaults to the OS's `prefers-color-scheme`
-- 📁 **Client-side upload guards** — PDF-only, max **4 files**, max **10 MB** each, duplicate-name detection
-- 💚 **Live backend health pill** — pings `GET /` on load so you immediately know if the backend isn't running
-- 📊 **Structured report rendering** — each finding renders as its own card with colored pills for status (🟢🟡🔴⚪) and severity (🔴🟡🟢), the quoted evidence, the analysis, and the recommendation
-- 🔁 **Chat-like continuity** — every message re-sends all currently uploaded files alongside the new prompt, so you never have to re-pick files to ask a follow-up question
-
-### 🔌 Connecting to the Backend
-
-```js
-const CONFIG = {
-  API_BASE_URL: "http://127.0.0.1:8000",
-  MAX_FILES: 4,
-  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-};
-```
-
-Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
 
 ---
 
