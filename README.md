@@ -27,7 +27,7 @@
 
 ### 📑 Table of Contents
 
-[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Front-End**](#-5-front-end) • [**5. Running the Project**](#-4-running-the-project) • [**6. Contributors**](#-6-contributors)
+[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Front-End**](#-4-front-end) • [**5. Running the Project**](#-5-running-the-project) • [**6. Contributors**](#-6-contributors)
 
 </div>
 
