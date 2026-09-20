@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VerifAi — Compliance Engine</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-text">
+            <h1>VerifAi</h1>
+            <div class="brand-sub">
+              Multi-document contract &amp; legal compliance analysis
+            </div>
+          </div>
+        </div>
+        <div class="header-right">
+          <div id="healthPill" class="status-pill">
+            <span class="dot"></span>
+            <span id="healthText">Checking backend…</span>
+          </div>
+          <button
+            id="themeToggle"
+            class="icon-btn"
+            title="Toggle theme"
+            type="button"
+          >
+            <svg
+              id="themeIcon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside>
+          <div class="sidebar-head">
+            <h2>Case Documents</h2>
+            <span class="file-count mono" id="fileCount">0 files</span>
+          </div>
+
+          <div id="dropZone">
+            <svg
+              class="glyph"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <path d="M14 2v6h6" />
+              <path d="M9.5 13.5h5M9.5 16.5h5" />
+            </svg>
+            <p>Upload legal instruments</p>
+            <small>PDF · up to 4 files · 10&nbsp;MB each</small>
+          </div>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".pdf,application/pdf"
+            multiple
+          />
+
+          <div id="fileList">
+            <p class="file-placeholder">No documents uploaded yet.</p>
+          </div>
+
+          <div class="sidebar-actions">
+            <button class="btn-outline" id="clearBtn" disabled type="button">
+              Clear all
+            </button>
+          </div>
+        </aside>
+
+        <main>
+          <div class="thread" id="thread">
+            <div class="empty-state" id="emptyState">
+              <h2>Start a compliance review</h2>
+              <p>
+                Upload the agreements you want cross-checked on the left, then
+                ask a question below — for example, "Compare the termination
+                clauses and flag any conflicts."
+              </p>
+            </div>
+          </div>
+
+          <div class="composer">
+            <div class="composer-inner">
+              <div id="status-line"></div>
+              <div class="composer-row">
+                <textarea
+                  id="promptInput"
+                  rows="1"
+                  placeholder="Ask VerifAi to check requirements, cross-reference clauses, or synthesize compliance…"
+                ></textarea>
+                <button id="sendBtn" type="button" disabled>
+                  Analyze
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+              <div class="composer-footnote">
+                VerifAi reasons only over the documents you upload. Verify
+                findings before relying on them.
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
