@@ -27,7 +27,7 @@
 
 ### 📑 Table of Contents
 
-[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Front-End**](#-4-front-end) • [**5. Contributors**](#-5-contributors)
+[**1. Project Description**](#-1-project-description) • [**2. AI Service**](#-2-ai-service) • [**3. Back-End**](#-3-back-end) • [**4. Running the Project**](#-4-running-the-project) • [**5. Front-End**](#-5-front-end) • [**6. Contributors**](#-6-contributors)
 
 </div>
 
@@ -451,17 +451,50 @@ Both the backend and the AI service used to define their own near-identical `Pay
 
 The backend only accepts requests from `http://127.0.0.1:5500` by default — the address VS Code's **Live Server** extension serves the frontend from. If you serve the frontend from a different address or port, update `allow_origins` in `backend/main.py`.
 
-### ▶️ Running the Back-End
+---
 
+## 🚀 4. Running the Project
+
+> Everything you need to get the backend and frontend running together, in order.
+
+<table>
+<tr><td>
+
+**1️⃣ Install dependencies** *(from the project root)*
+```bash
+pip install -r requirements.txt
+```
+
+**2️⃣ Add your Groq API key**
+
+Create a `.env` file in the **project root**:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+MODEL_NAME=openai/gpt-oss-20b
+```
+
+**3️⃣ Start the backend**
 ```bash
 uvicorn backend.main:app --reload --port 8000
 ```
+Run this from the **project root** (not from inside `backend/`) — imports like `from ai_service.code.pipeline import analyse` and `from shared.schemas import Payload` are resolved relative to the root. Leave this terminal running — you should see `API is working` at `http://127.0.0.1:8000/`.
 
-Run this from the **project root** (not from inside `backend/`) — imports like `from ai_service.code.pipeline import analyse` and `from shared.schemas import Payload` are resolved relative to the root.
+**4️⃣ Start the frontend**
+
+Open the `frontend/` folder in VS Code, right-click `index.html` → **Open with Live Server** *(serves on `127.0.0.1:5500` by default, matching the backend's CORS setting)*.
+
+> ⚠️ If you serve the frontend from a different port, the backend will reject its requests with a CORS error — update `allow_origins` in `backend/main.py` to match.
+
+**5️⃣ Use it**
+
+In the browser: upload up to 4 PDFs (keep `privacy`, `terms`/`tos`, `nda`, or `compliance` in the filenames), type a question, and hit **Analyze**.
+
+</td></tr>
+</table>
 
 ---
 
-## 🎨 4. Front-End
+## 🎨 5. Front-End
 
 > **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
 
@@ -494,54 +527,9 @@ const CONFIG = {
 
 Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
 
-### ▶️ Running the Front-End
-
-Any static file server works, but the backend's CORS is pre-configured for **VS Code Live Server**:
-
-1. Open the `frontend/` folder in VS Code
-2. Right-click `index.html` → **Open with Live Server** *(serves on `127.0.0.1:5500` by default)*
-3. Make sure the backend is already running on `127.0.0.1:8000`
-
-> ⚠️ If you serve the frontend from a different port, the backend will reject its requests with a CORS error — update `allow_origins` in `backend/main.py` to match.
-
-### 🚀 Running the Whole Project, Start to Finish
-
-<table>
-<tr><td>
-
-**1️⃣ Install dependencies** *(from the project root)*
-```bash
-pip install -r requirements.txt
-```
-
-**2️⃣ Add your Groq API key**
-
-Create a `.env` file in the **project root**:
-```env
-GROQ_API_KEY=your_groq_api_key_here
-MODEL_NAME=openai/gpt-oss-20b
-```
-
-**3️⃣ Start the backend**
-```bash
-uvicorn backend.main:app --reload --port 8000
-```
-Leave this terminal running — you should see `API is working` at `http://127.0.0.1:8000/`.
-
-**4️⃣ Start the frontend**
-
-Open `frontend/index.html` with VS Code's **Live Server** extension.
-
-**5️⃣ Use it**
-
-In the browser: upload up to 4 PDFs (keep `privacy`, `terms`/`tos`, `nda`, or `compliance` in the filenames), type a question, and hit **Analyze**.
-
-</td></tr>
-</table>
-
 ---
 
-## 👥 5. Contributors
+## 👥 6. Contributors
 
 <div align="center">
 
