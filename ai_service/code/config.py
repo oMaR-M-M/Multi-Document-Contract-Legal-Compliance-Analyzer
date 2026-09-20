@@ -4,20 +4,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
-# ---------------------------------------------------
-# Load the ONE .env file at the project root, using an explicit
-# absolute path instead of relying on the current working directory.
-#
-# This is the actual root cause of "it worked in my demo but not
-# when the API runs it": load_dotenv() with no arguments searches
-# upward from the CURRENT WORKING DIRECTORY, not from this file's
-# location. That happened to match when someone ran demo.py directly
-# from inside ai_service/code/, but broke when uvicorn launches the
-# app from the project root instead. Resolving the path from
-# __file__ makes this work identically no matter how or from where
-# the app is started.
-# ---------------------------------------------------
-ROOT_DIR = Path(__file__).resolve().parents[2]  # ai_service/code -> ai_service -> project root
+# ai_service/code -> ai_service -> project root
+ROOT_DIR = Path(__file__).resolve().parents[2]  
 load_dotenv(ROOT_DIR / ".env")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
