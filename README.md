@@ -383,21 +383,161 @@ refrech()  # 🔄 clear session state
 
 ## ⚙️ 3. Back-End
 
-<div align="center">
+> A thin **FastAPI** service that sits between the frontend and the AI pipeline. It has exactly one job: turn uploaded PDFs into the JSON shape the AI service expects, run the analysis, and hand back the report.
 
-### 🚧 *Coming soon.* 🚧
+### 🗺️ Request Flow
 
-</div>
+```mermaid
+flowchart LR
+    A["🌐 Frontend<br/>FormData: files + prompt"] -->|"POST /analyze"| B["⚡ FastAPI<br/>backend/main.py"]
+    B --> C["📄 pdf_parser.py<br/>build_payload()"]
+    C --> D["📐 shared/schemas.py<br/>Payload"]
+    D --> E["🧠 ai_service<br/>analyse(query, files)"]
+    E --> F["📊 ComplianceReport"]
+    F -->|"JSON response"| A
+
+    style A fill:#2563eb,stroke:#1e40af,color:#fff
+    style B fill:#059669,stroke:#047857,color:#fff
+    style C fill:#0891b2,stroke:#0e7490,color:#fff
+    style D fill:#7c3aed,stroke:#5b21b6,color:#fff
+    style E fill:#dc2626,stroke:#b91c1c,color:#fff
+    style F fill:#ea580c,stroke:#c2410c,color:#fff
+```
+
+### 📡 API Reference
+
+| Method | Endpoint | Description |
+|:---|:---|:---|
+| `GET` | `/` | 💓 Health check — returns `{"message": "API is working"}` |
+| `POST` | `/analyze` | 🔍 Runs a full compliance analysis |
+
+**`POST /analyze`** — `multipart/form-data`
+
+| Field | Type | Description |
+|:---|:---|:---|
+| `files` | `File[]` | One or more PDF documents |
+| `prompt` | `str` | The compliance question to ask |
+
+**Response** — a `ComplianceReport` JSON object (`status`, `summary`, `findings[]`) — the exact same schema documented in [Section 2](#-2-ai-service).
+
+### 📄 PDF Parsing — `pdf_parser.py`
+
+Uploaded PDFs aren't documents the AI service understands yet — they're raw bytes. `build_payload()` converts each `UploadFile` into a structured `Document`:
+
+| Step | What happens |
+|:---|:---|
+| 1️⃣ **Extract text** | `pypdf.PdfReader` pulls text page-by-page |
+| 2️⃣ **Normalize** | Collapses repeated whitespace, blank lines, and trims every line |
+| 3️⃣ **Classify type** | Infers `document_type` from the **filename** (see table below) |
+| 4️⃣ **Build ID** | Uses the filename (without extension) as `document_id` |
+
+🏷️ **Document type detection** (by keyword in filename, case-insensitive):
+
+| Filename contains | `document_type` |
+|:---|:---|
+| `privacy` | `privacy_policy` |
+| `terms` / `tos` | `terms_of_services` |
+| `nda` | `vendor_nda` |
+| `compliance` | `compliance_requirements` |
+| *(none of the above)* | `unknown` |
+
+> 💡 **This means naming matters.** A file uploaded as `contract_v2.pdf` won't be recognized as any known type. Keep one of the keywords above in each filename.
+
+### 🧩 Shared Schemas — `shared/schemas.py`
+
+Both the backend and the AI service used to define their own near-identical `Payload`/`Document` classes — a classic duplication trap where the two could silently drift apart. They're now unified into **one source of truth** in `shared/schemas.py`, imported by both sides. If the shape of a document ever changes, it changes in exactly one place.
+
+### 🔐 CORS
+
+The backend only accepts requests from `http://127.0.0.1:5500` by default — the address VS Code's **Live Server** extension serves the frontend from. If you serve the frontend from a different address or port, update `allow_origins` in `backend/main.py`.
+
+### ▶️ Running the Back-End
+
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+Run this from the **project root** (not from inside `backend/`) — imports like `from ai_service.code.pipeline import analyse` and `from shared.schemas import Payload` are resolved relative to the root.
 
 ---
 
 ## 🎨 4. Front-End
 
-<div align="center">
+> **VerifAi** — a single-page, no-build-step chat interface. Plain HTML, CSS, and JavaScript — no frameworks, no bundler, nothing to compile.
 
-### 🚧 *Coming soon.* 🚧
+### 🖥️ What It Looks Like
 
-</div>
+A two-pane layout:
+
+| Pane | Contents |
+|:---|:---|
+| 📂 **Sidebar** | Drag-and-drop (or click-to-browse) PDF upload, file list with size + status badges, "Clear all" |
+| 💬 **Main thread** | A chat-style conversation — your questions on one side, rendered compliance report cards on the other |
+
+### ✨ Features
+
+- 🌗 **Dark / light theme toggle** — preference saved to `localStorage`, defaults to the OS's `prefers-color-scheme`
+- 📁 **Client-side upload guards** — PDF-only, max **4 files**, max **10 MB** each, duplicate-name detection
+- 💚 **Live backend health pill** — pings `GET /` on load so you immediately know if the backend isn't running
+- 📊 **Structured report rendering** — each finding renders as its own card with colored pills for status (🟢🟡🔴⚪) and severity (🔴🟡🟢), the quoted evidence, the analysis, and the recommendation
+- 🔁 **Chat-like continuity** — every message re-sends all currently uploaded files alongside the new prompt, so you never have to re-pick files to ask a follow-up question
+
+### 🔌 Connecting to the Backend
+
+```js
+const CONFIG = {
+  API_BASE_URL: "http://127.0.0.1:8000",
+  MAX_FILES: 4,
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+};
+```
+
+Every message sends a `multipart/form-data` `POST` to `{API_BASE_URL}/analyze` with the uploaded files plus the prompt, and renders whatever `ComplianceReport` comes back. No API key ever touches the browser — the Groq key lives only on the backend.
+
+### ▶️ Running the Front-End
+
+Any static file server works, but the backend's CORS is pre-configured for **VS Code Live Server**:
+
+1. Open the `frontend/` folder in VS Code
+2. Right-click `index.html` → **Open with Live Server** *(serves on `127.0.0.1:5500` by default)*
+3. Make sure the backend is already running on `127.0.0.1:8000`
+
+> ⚠️ If you serve the frontend from a different port, the backend will reject its requests with a CORS error — update `allow_origins` in `backend/main.py` to match.
+
+### 🚀 Running the Whole Project, Start to Finish
+
+<table>
+<tr><td>
+
+**1️⃣ Install dependencies** *(from the project root)*
+```bash
+pip install -r requirements.txt
+```
+
+**2️⃣ Add your Groq API key**
+
+Create a `.env` file in the **project root**:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+MODEL_NAME=openai/gpt-oss-20b
+```
+
+**3️⃣ Start the backend**
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+Leave this terminal running — you should see `API is working` at `http://127.0.0.1:8000/`.
+
+**4️⃣ Start the frontend**
+
+Open `frontend/index.html` with VS Code's **Live Server** extension.
+
+**5️⃣ Use it**
+
+In the browser: upload up to 4 PDFs (keep `privacy`, `terms`/`tos`, `nda`, or `compliance` in the filenames), type a question, and hit **Analyze**.
+
+</td></tr>
+</table>
 
 ---
 
@@ -428,9 +568,9 @@ RAG pipeline, multi-hop retrieval, LLM reasoning & prompt engineering
 ### 🔀
 **Omar Karam**
 
-`Front-End & Back-End`
+`Full-Stack Integration`
 
-API layer, session handling, document ingestion endpoints
+Built the API layer and connected the backend and frontend together — linking the pipeline script to the frontend's operations end-to-end
 
 [![GitHub](https://img.shields.io/badge/@8--Omoshikiii--8-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/8-Omoshikiii-8)
 
@@ -442,7 +582,7 @@ API layer, session handling, document ingestion endpoints
 
 `Back-End`
 
-*[Contribution]*
+Built the PDF parser and converted uploaded documents into structured JSON for the AI service to consume
 
 [![GitHub](https://img.shields.io/badge/@Omar--Mohamed--2006-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Omar-Mohamed-2006)
 
@@ -454,7 +594,7 @@ API layer, session handling, document ingestion endpoints
 
 `Front-End`
 
-*[Contribution]*
+Wrote the JavaScript powering the project's interactive frontend
 
 [![GitHub](https://img.shields.io/badge/@Alex--RavenHolm-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Alex-RavenHolm)
 
