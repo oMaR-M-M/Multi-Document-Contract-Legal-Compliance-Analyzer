@@ -1,14 +1,3 @@
-"""
-Single source of truth for every data shape used across backend,
-ai_service, and (indirectly) the frontend's JSON contract.
-
-Previously this project had TWO different `Payload`/`Document` classes
-defined independently (one in Back-end/schemas.py, one in
-AI_service/code/schemas.py) that happened to look similar and were
-used interchangeably by duck-typing. That's fragile: if one drifts
-from the other, you get confusing runtime errors instead of a clear
-import error. This module removes that duplication.
-"""
 from enum import Enum
 from typing import Literal
 from pydantic import BaseModel, ConfigDict
@@ -81,6 +70,8 @@ class Evidence(BaseModel):
 class QueryIntent(BaseModel):
     is_requirement_check: bool
     target_doc_types: list[str]
+    # short topic phrases of the query, one requirement search per topic (empty = use the whole query)
+    topics: list[str] = []
 
 
 # ---------------------------------------------------
