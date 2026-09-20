@@ -50,3 +50,15 @@ REQUIREMENTS_BATCH_SIZE = 3
 
 # Dimension of the embeddings
 dim = 384
+
+REQ_PREFIX_TO_DOC = {
+    "2": "vendor_nda",
+    "3": "terms_of_services",
+    "4": "privacy_policy",
+}
+
+MIN_REQ_SCORE = 0.25
+REQ_REL_SCORE = 0.70
+
+USE_CHAT_HISTORY = False
+DEBUG_RETRIEVAL = False
