@@ -450,7 +450,101 @@ Everything below is in `ai_service/code/config.py`.
 | Privacy Policy retention + international transfers | 🟢 both `COMPLIANT` — transfers are on page 2 |
 | ToS references the Privacy Policy | 🟢 `COMPLIANT` (ToS section 4, page 1) — the same answer however the question is worded |
 
-**📄 Requirements file format:** requirement chunks are created from numbered clauses (`2.4 Title`), `REQ-` ids and bullets. The clause filter is tuned to a rubric whose requirements are in sections **2–5**. If your requirements file is numbered differently, adjust `_REQ_KEEP_RE` in `chunking.py` and `REQ_PREFIX_TO_DOC` in `config.py`.
+**📄 Requirements file:** the file must follow a few simple rules so that every requirement is found and checked against the right contract — see [Rules for the Compliance Requirements File](#-rules-for-the-compliance-requirements-file) below.
+
+---
+
+### 📜 Rules for the Compliance Requirements File
+
+> The requirements file is the rulebook the whole system checks against. The AI service cuts it into requirements **automatically**, so the file has to follow a few simple rules. If it doesn't, requirements can be lost, merged together, or checked against the wrong contract.
+
+#### 1️⃣ The file itself
+
+| Rule | Why |
+|:---|:---|
+| Use a **text-based PDF**, not a scan or an image | Text is extracted with `pypdf` and there is no OCR — a scanned PDF gives empty pages |
+| The filename must contain **`compliance`** | This is how the back-end recognizes the file as `compliance_requirements` |
+| The filename must **not** contain `privacy`, `terms`, `tos` or `nda` — **even inside another word** | The back-end checks the name in this order: `privacy` → `terms`/`tos` → `nda` → `compliance`, and the **first match wins**. A file called `standards_compliance.pdf` would be treated as an NDA, because `sta`**`nda`**`rds` contains `nda` |
+| One requirements file per session | The UI accepts 4 files: the requirements file + the NDA + the Terms of Service + the Privacy Policy |
+
+#### 2️⃣ One requirement = one numbered clause
+
+- Each requirement starts on **its own line** with a number and a title, and the rule text follows it:
+  `2.4 Security and Incident Notification — Minimum Standard`
+- `REQ-1.1 …` style ids work too.
+- **Cross-document rules** (rules that compare two contracts) are written as bullets: `• Data use consistency — …`
+- The number, the title and the rule stay together in **one chunk**, so put **one topic per clause**. A clause that mixes three topics matches searches badly.
+
+#### 3️⃣ The section number decides which contract is checked
+
+| Clause | Checked against | `document_type` |
+|:---:|:---|:---|
+| `2.x` | NDA | `vendor_nda` |
+| `3.x` | Terms of Service | `terms_of_services` |
+| `4.x` | Privacy Policy | `privacy_policy` |
+| bullets, `REQ-` ids, anything else | **every** document *(top-2 chunks from each)* | — |
+
+This mapping is written by hand in `REQ_PREFIX_TO_DOC` (`config.py`). Only the **first character** of the clause number is read, so requirement sections must have a **single digit** — a clause `10.1` would be read as section `1`. The chunker keeps clauses numbered `2.x`–`5.x`, `REQ-` ids and bullets (`_REQ_KEEP_RE` in `chunking.py`).
+
+#### 4️⃣ Everything that is not a requirement goes outside sections 2–5
+
+Purpose and scope, review metadata, the outcome rubric, definitions and any checklist appendix should live **outside** the requirement sections (for example in section `1` and in sections `6` and later). They are ignored. Two details:
+
+- **Close the last requirement with a numbered heading** (for example `6. Review Outcome Rubric`). Text that follows the last clause without a new heading is glued onto that clause.
+- Don't repeat the same rule in a checklist inside the requirement sections. Only identical duplicates are removed.
+
+#### 5️⃣ Write rules that the search and the LLM can use
+
+- 🔢 **Put the value in the text**: *"within twenty-four (24) hours of discovery"*, *"no less than three (3) years"*. The LLM compares the numbers, and a different value in the contract becomes `NON_COMPLIANT`.
+- 🗣️ **Use the words a contract would use** (*survive termination*, *Confidential Information*, *retention period*). Retrieval is semantic, so matching vocabulary matters.
+- 🧩 **Make every clause self-contained.** No *"as above"* or *"see 2.3"*, because each clause is read on its own.
+- 🎯 **Start with the subject**: *"The NDA must…"*, *"The ToS must…"*, *"The policy must…"*.
+- 🚩 **Mark the hard rules** with `— Minimum Standard` in the title. If one of them fails, the finding gets severity `HIGH`.
+- 📊 **Avoid tables for rules.** PDF text extraction can cut table cells. Use plain sentences.
+- ✅ Dots inside numbers (`TLS 1.3`, `REQ-1.1`) are safe.
+
+#### 6️⃣ Headers and footers
+
+A running page header that ends with `| Page N` at the top of each page is removed automatically. Other repeating headers or footers are **not** removed, and they end up inside the clause text, so keep the pages clean.
+
+#### 📋 Template
+
+```text
+1. Purpose and Scope                       ← ignored (section 1)
+   This standard applies to every customer-facing agreement...
+
+2. NDA Requirements
+2.4 Security and Incident Notification — Minimum Standard
+The recipient must report any actual or suspected unauthorized access
+to Confidential Information in writing within twenty-four (24) hours of discovery.
+
+2.5 Duration of Confidentiality Obligations — Minimum Standard
+Confidentiality obligations must survive termination for no less than three (3) years.
+
+3. Terms of Service Requirements
+3.4 Privacy Alignment — Minimum Standard
+The ToS must state that personal information is handled in accordance with the Privacy Policy.
+
+4. Privacy Policy Requirements
+4.4 International Transfers
+If data is transferred internationally, the policy must name the safeguard (for example, Standard Contractual Clauses).
+
+5. Cross-Document Consistency Rules
+• Data use consistency — the ToS must not authorize data use that contradicts the Privacy Policy.
+• Retention consistency — no other document may promise a retention rule that conflicts with the Privacy Policy.
+
+6. Review Outcome Rubric                   ← closes the last requirement, ignored from here on
+```
+
+**🔧 If your file is numbered differently:** edit `_REQ_KEEP_RE` in `chunking.py` and `REQ_PREFIX_TO_DOC` in `config.py`. If the file has **no** numbered clauses or bullets at all, the splitter falls back to cutting it sentence by sentence. That still works, but the clause numbers are lost and every requirement is checked against **every** document.
+
+**✅ Quick checklist**
+
+- [ ] Text-based PDF, filename contains `compliance` and none of `privacy` / `terms` / `tos` / `nda`
+- [ ] Every requirement is a numbered clause (or a bullet for cross-document rules) on its own line
+- [ ] Sections `2` / `3` / `4` match NDA / ToS / Privacy Policy, with single-digit section numbers
+- [ ] Each clause is one topic, self-contained, with the exact values written out
+- [ ] Non-requirement text sits outside sections 2–5, and a numbered heading closes the last requirement
 
 ---
 
