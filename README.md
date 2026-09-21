@@ -56,7 +56,7 @@ This system automates that cross-document comparison. You ask a question → it 
 ### 🔍
 **Metadata Filtering**
 
-Determines which *types* of documents are relevant before searching. Asking about an NDA only searches NDA content — cutting noise and boosting precision.
+Determines which *types* of documents are relevant before searching — from the question **and** from the requirement's own clause number (`2.x` → NDA, `3.x` → ToS, `4.x` → Privacy). Asking about an NDA only searches NDA content — cutting noise and boosting precision.
 
 </td>
 <td width="33%" align="center">
@@ -72,7 +72,7 @@ Doesn't just search once. First finds the relevant *requirement*, then uses it t
 ### ✅
 **Grounded Reporting**
 
-Every finding must cite real evidence. Uses only retrieved text — never external knowledge. Returns `INSUFFICIENT_EVIDENCE` rather than guessing.
+Every finding must cite real evidence. Uses only retrieved text — never external knowledge. Returns `INSUFFICIENT_EVIDENCE` rather than guessing. Document, page and section are filled in **by code** from the chunk that really contains the quote.
 
 </td>
 </tr>
@@ -81,11 +81,16 @@ Every finding must cite real evidence. Uses only retrieved text — never extern
 ### 🧪 Example in Action
 
 > **❓ Query:**
-> *"Does the Privacy Policy comply with our encryption requirements at rest and in transit?"*
+> *"Does the Vendor NDA's confidentiality survival period and breach notification timeline comply with our compliance requirements?"*
 
-> **🚨 Result:** `NON_COMPLIANT`
+> **🚨 Result:** `NON_COMPLIANT` — *Evaluated 2 requirement(s): 2 non-compliant.*
 >
-> The system matched **`REQ-1.1`** (AES-256 at rest, TLS 1.3 in transit), retrieved the Privacy Policy's *Data Security Measures* section on **page 1**, and found that while ✅ TLS 1.3 is correctly used in transit, ❌ data at rest uses **AES-128** instead of the required **AES-256**.
+> The router split the question into two topics and matched **clause `2.5`** (confidentiality must survive **≥ 3 years**) and **clause `2.4`** (incident notice within **24 hours**). For each one it searched only the NDA:
+>
+> | Finding | Severity | Evidence found | Verdict |
+> |:---|:---:|:---|:---|
+> | `F-001` — clause 2.5 · `vendor_nda.pdf` **page 2** | 🔴 HIGH | obligations survive for **two (2) years** | ❌ less than the required 3 years |
+> | `F-002` — clause 2.4 · `vendor_nda.pdf` **page 1** | 🔴 HIGH | notice within **five (5) business days** | ❌ contradicts the 24-hour requirement |
 
 ### 🏷️ Compliance Status Types
 
@@ -108,41 +113,42 @@ Every finding must cite real evidence. Uses only retrieved text — never extern
 flowchart TD
     A["📥 User Query + Payload Documents"] --> B{"📂 Document Type<br/>Classifier"}
 
-    B -->|compliance_requirements| C["✂️ Sentence Splitter<br/>+ Deduplication"]
-    B -->|NDA / Privacy / TOS| D["✂️ Character Text Splitter<br/>CHUNK_SIZE + OVERLAP"]
+    B -->|compliance_requirements| C["✂️ Clause Splitter<br/>1 chunk = 1 numbered clause / bullet"]
+    B -->|NDA / Privacy / TOS| D["✂️ Character Text Splitter<br/>pages joined first · CHUNK_SIZE + OVERLAP"]
 
     C --> E["📦 all_req_chunks"]
     D --> F["📦 all_doc_chunks"]
 
-    F --> G["🧭 LLM Query Router<br/>route_query()"]
-    G --> H["🔍 Metadata Filter<br/>filtered_doc_chunks"]
+    A --> G["🧭 Query Router<br/>route_query()<br/>keywords → document types<br/>LLM → intent + topics"]
 
     E --> I["🗂️ FAISS index_req"]
-    H --> J["🗂️ FAISS index_doc"]
+    F --> J["🗂️ FAISS index_doc<br/>(all contracts)"]
 
-    I --> K{"🤔 is_requirement_check?"}
+    G --> K{"🤔 is_requirement_check?"}
+    I --> K
     J --> K
 
-    K -->|✅ True| L["🔗 PATH A: MULTI-HOP<br/>─────────────────<br/>1️⃣ Query → index_req (Hop 1, top-4)<br/>2️⃣ Deduplicate unique reqs<br/>3️⃣ Embed requirement text<br/>4️⃣ Req → index_doc (Hop 2, top-5)"]
-    K -->|❌ False| M["➡️ PATH B: DIRECT SEARCH<br/>─────────────────<br/>1️⃣ Query → index_doc<br/>2️⃣ Retrieve top-5 evidence"]
+    K -->|✅ True| L["🔗 PATH A: MULTI-HOP<br/>─────────────────<br/>1️⃣ Each topic → index_req (Hop 1)<br/>score + document-type filters<br/>2️⃣ Each requirement → index_doc (Hop 2)<br/>only the document type its clause applies to"]
+    K -->|❌ False| M["➡️ PATH B: DIRECT SEARCH<br/>─────────────────<br/>1️⃣ Query → index_doc<br/>2️⃣ Router's document types, top-5"]
 
-    L --> N["🧠 REASONING & FACT-CHECKING ENGINE<br/>─────────────────<br/>Evidence + Requirements + Chat Memory"]
+    L -->|no requirement passes the score filter| R["⚪ INSUFFICIENT_EVIDENCE<br/>no matching requirement<br/>(no LLM call)"]
+    L --> N["🧠 REASONING ENGINE<br/>─────────────────<br/>One LLM call per requirement,<br/>with its own evidence"]
     M --> N
 
-    N --> O["📐 Structured LLM Prompt Execution"]
-    O --> P["🛡️ Pydantic Schema Validation"]
+    N --> O["🛡️ Structured output<br/>+ Pydantic validation"]
+    O --> P["📌 Built in code:<br/>citations · overall status · summary"]
     P --> Q["📊 ComplianceReport JSON"]
 
     style A fill:#2563eb,stroke:#1e40af,color:#fff
     style B fill:#7c3aed,stroke:#5b21b6,color:#fff
     style G fill:#7c3aed,stroke:#5b21b6,color:#fff
     style K fill:#7c3aed,stroke:#5b21b6,color:#fff
-    style H fill:#0891b2,stroke:#0e7490,color:#fff
     style I fill:#0891b2,stroke:#0e7490,color:#fff
     style J fill:#0891b2,stroke:#0e7490,color:#fff
     style L fill:#059669,stroke:#047857,color:#fff
     style M fill:#059669,stroke:#047857,color:#fff
     style N fill:#dc2626,stroke:#b91c1c,color:#fff
+    style P fill:#ea580c,stroke:#c2410c,color:#fff
     style Q fill:#ea580c,stroke:#c2410c,color:#fff
 ```
 
@@ -151,28 +157,30 @@ flowchart TD
 ### 🔄 Pipeline Stages
 
 <details open>
-<summary><h4>📄 Stage 1 — Ingestion & Chunking <code>chunking.py</code></h4></summary>
+<summary><h4>📄 Stage 1 — Ingestion & Chunking <code>chunking.py</code> · <code>pipeline.py</code></h4></summary>
 
 Documents arrive as a `Payload` of `Document` objects, each containing pages with text, page numbers, and section titles. They're split using **two different strategies** depending on type:
 
 | 📁 Document Type | ⚙️ Strategy | 💭 Why |
 |:---|:---|:---|
-| `compliance_requirements` | Regex sentence split + deduplication | Each requirement is an **atomic rule** evaluated independently |
-| Contracts (NDA, Privacy, TOS) | `RecursiveCharacterTextSplitter`<br/>*(1000 chars, 150 overlap)* | Legal clauses need **surrounding context** to be interpreted correctly |
+| `compliance_requirements` | **One chunk per numbered clause** (`2.4 …`, `REQ-1.1 …`) **or per bullet** (`• …`), deduplicated. Everything that is not a requirement (intro, review metadata, the appendix checklist) is dropped | Each requirement is an **atomic rule** evaluated independently, and it keeps its **clause number and heading** |
+| Contracts (NDA, Privacy, TOS) | Pages are **joined first**, then `RecursiveCharacterTextSplitter`<br/>*(1000 chars, 150 overlap)* | Legal clauses need **surrounding context**, and a clause that runs across a **page break** must stay in one chunk |
 
-The requirement splitter uses a regex that deliberately **does not** split on periods between digits:
+**🧹 Clean-up before splitting** — the running page header (`… | Page N`) that PDF extraction leaves at the top of every page is removed, and the different bullet marks that PDF extractors produce (`•`, `\x7f`, …) are normalized to `• `.
+
+**🏷️ Chunk metadata** — every chunk carries `document_id`, `filename`, `document_type`, `page_number` and `section_title`, which is what makes **precise citations** possible later. For a requirement chunk the `section_title` is its heading line (e.g. `2.4 Security and Incident Notification — Minimum Standard`); the clause number is what tells the pipeline which document type the requirement applies to. For a contract chunk, `page_number` is the page where the chunk **starts**.
+
+**🛟 Fallback** — if a requirements file has no numbered clauses or bullets, the splitter falls back to the previous strategy: a regex sentence split that deliberately **does not** split on periods between digits:
 
 ```python
 _SENTENCE_SPLIT_RE = re.compile(r'(?<!\d)\.(?!\d)')
 ```
 
-> ⚠️ **Why this matters:** A naive `.split(".")` would shatter
+> ⚠️ **Why the digit rule matters:** a naive `.split(".")` would shatter
 > `REQ-1.1: ...encrypted using TLS 1.3 protocol`
 > into three broken fragments — `REQ-1`, `1: ...TLS 1`, and `3 protocol` — which caused the model to evaluate against a **nonexistent "TLS 1" standard**.
 
-Deduplication also runs here, since policy documents repeat boilerplate across pages.
-
-📌 Every chunk carries full metadata (`document_id`, `filename`, `document_type`, `page_number`, `section_title`) — this is what makes **precise citations** possible later.
+**♻️ Each document is chunked once.** The frontend re-sends every uploaded file with every message. `pipeline.py` remembers the documents it has already chunked (`_seen_docs`, keyed by `document_id` + `filename`) and skips them. Without this, every question added another copy of every chunk, the top-k results became copies of the same clause, and reports lost findings over the session.
 
 </details>
 
@@ -186,26 +194,29 @@ Two separate indexes are built per request:
 | Index | Contents |
 |:---|:---|
 | 🗂️ `index_req` | All requirement chunks |
-| 🗂️ `index_doc` | Only the **filtered** contract chunks for this query |
+| 🗂️ `index_doc` | **All** contract chunks — the document-type filter is applied **after** the search (over-fetch, then filter), because each requirement decides which document type it searches |
 
 </details>
 
 <details open>
 <summary><h4>🧭 Stage 3 — Query Routing <code>reasoning.py</code></h4></summary>
 
-Before any retrieval happens, the query goes to the LLM for **intent classification**, returning a `QueryIntent`:
+Before any retrieval happens, the query is routed and returns a `QueryIntent`:
 
 ```python
 class QueryIntent(BaseModel):
     is_requirement_check: bool
     target_doc_types: list[str]
+    topics: list[str] = []
 ```
 
-**🔀 `is_requirement_check`** — Is this a compliance check *("does X comply with...")* or a plain factual lookup *("what does the NDA say about...")*? This decides **which retrieval path runs**.
+**🔀 `is_requirement_check`** *(LLM)* — Is this a compliance check *("does X comply with...")* or a plain factual lookup *("what does the NDA say about...")*? This decides **which retrieval path runs**.
 
-**🎯 `target_doc_types`** — Which document types matter here: `privacy_policy`, `vendor_nda`, `terms_of_services`, or `all`. **This is the metadata filter.**
+**🎯 `target_doc_types`** *(keywords)* — Which document types matter here: `privacy_policy`, `vendor_nda`, `terms_of_services`, or `all`. The document names in the query (`NDA` / `non-disclosure`, `Terms of Service` / `ToS`, `Privacy`) are detected with **keywords in Python**, not by the LLM: the LLM router was not stable when a query named two documents, and the same question could get different targets. The LLM's answer is used only when the query names no document.
 
-> 🛡️ **Safe fallback:** If the filter produces an empty set, the pipeline reverts to searching all documents rather than returning nothing.
+**🧩 `topics`** *(LLM)* — The distinct compliance subjects of the query, as short phrases. A question like *"survival period **and** breach notification timeline"* becomes two topics, and **each topic gets its own requirement search**, so a two-part question finds both clauses instead of only one. If no topics are returned, the whole query is used.
+
+> 🛡️ **Safe fallback:** On the direct-search path, if the document filter produces an empty set, the pipeline reverts to searching all documents rather than returning nothing.
 
 </details>
 
@@ -215,18 +226,34 @@ class QueryIntent(BaseModel):
 #### 🔗 Path A — Multi-Hop *(compliance checks)*
 
 ```
-1️⃣  HOP 1  →  Search query against index_req  →  top-2 relevant requirements
-2️⃣          →  Deduplicate matched requirement texts
-3️⃣          →  Embed each requirement
-4️⃣  HOP 2  →  Search each requirement against index_doc  →  top-3 evidence chunks
-5️⃣          →  Deduplicate evidence across requirements
+1️⃣  HOP 1  →  For each topic: search index_req  →  top-2 requirements (top-4 if there were no topics)
+                 keep only requirements with  score ≥ MIN_REQ_SCORE
+                                        and   score ≥ REQ_REL_SCORE × best score of that topic
+                 keep only requirements that apply to the documents named in the query
+2️⃣          →  Deduplicate matched requirements
+3️⃣          →  No requirement left?  →  INSUFFICIENT_EVIDENCE report, no LLM call
+4️⃣  HOP 2  →  For each requirement: search index_doc, keep chunks of the document type
+                 the clause applies to  →  top-5 evidence chunks, kept per requirement
 ```
+
+**📎 Which document does a requirement apply to?** The clause number decides (`REQ_PREFIX_TO_DOC` in `config.py`):
+
+| Clause | Applies to | `document_type` |
+|:---:|:---|:---|
+| `2.x` | NDA requirements | `vendor_nda` |
+| `3.x` | Terms of Service requirements | `terms_of_services` |
+| `4.x` | Privacy Policy requirements | `privacy_policy` |
+| section 5 bullets, anything else | cross-document rules | **every** document *(top-2 chunks from each)* |
+
+So a `3.4` requirement is always checked against the ToS, however the question is phrased.
 
 > 💡 **This is what makes the system cross-document:** the query touches the *requirements* file, but the evidence comes from the *contracts*. Two documents that never reference each other get **connected through the embedding space**.
 
+> 🔗 **Evidence stays attached to its requirement.** It is no longer pooled into one list, so the LLM never has to guess which passage belongs to which rule.
+
 #### ➡️ Path B — Direct Search *(factual lookups)*
 
-A single search of the query against `index_doc`, returning **top-5 evidence chunks**. No requirement hop, because there's no rule to check against.
+A single search of the query against `index_doc`, keeping chunks of the document types the router selected and returning the **top-5 evidence chunks**. No requirement hop, because there's no rule to check against.
 
 ✨ Both paths converge on the same reasoning step.
 
@@ -235,7 +262,7 @@ A single search of the query against `index_doc`, returning **top-5 evidence chu
 <details open>
 <summary><h4>🧠 Stage 5 — Reasoning & Report Generation <code>reasoning.py</code></h4></summary>
 
-Retrieved evidence is formatted into labeled blocks with **full provenance**:
+The LLM is called **once per requirement**, and it sees only that requirement and its own evidence. Retrieved evidence is formatted into labeled blocks with **full provenance**:
 
 ```
 Evidence 1:
@@ -246,17 +273,31 @@ Evidence 1:
 📝 Text: ...
 ```
 
-This goes to the LLM alongside the target requirements and conversation history from `ConversationBufferMemory`, under a system prompt with **strict grounding rules**:
+The system prompt has **strict grounding rules** and explicit **status decision rules**:
 
 | # | 🔒 Rule |
 |:---:|:---|
 | 1 | Use **ONLY** the provided requirements and evidence |
 | 2 | Do **NOT** use external knowledge |
 | 3 | Do **NOT** invent document names, page numbers, sections, or evidence |
-| 4 | If evidence is insufficient → return `INSUFFICIENT_EVIDENCE` |
+| 4 | If evidence is insufficient → return `INSUFFICIENT_EVIDENCE` — but **only** when none of the evidence discusses the requirement's subject |
 | 5 | Produce **one `Finding` for every requirement** |
+| 6 | Requirement states a value (hours, days, years, a list) and the evidence states a **different** one → `NON_COMPLIANT`, never `INSUFFICIENT_EVIDENCE` |
+| 7 | Evidence covers **some** of the required elements → `PARTIALLY_COMPLIANT`, and the analysis names what is missing |
+| 8 | A failed **"Minimum Standard"** requirement gets severity `HIGH` |
+| 9 | Copy the document and page exactly as written in the evidence — a section number is **not** a page number |
 
-Output is constrained through LangChain's `with_structured_output(ComplianceReport)`, so the response is validated against the Pydantic schema **before it's ever returned** — malformed output fails loudly instead of silently passing bad data downstream.
+**📌 What the code decides, not the LLM** — the LLM writes the status, severity, quoted evidence, analysis and recommendation of each finding. Everything that must be exact is built in code:
+
+| Built in code | How |
+|:---|:---|
+| `finding_id` | numbered `F-001`, `F-002`, … |
+| `requirement` | the exact requirement text that was retrieved |
+| `document` · `page` · `section` | taken from the chunk that **really contains the quote** (matched against the retrieved evidence). If the quote cannot be matched, they are `N/A` / `0` and a note is added to the analysis |
+| overall `status` | all `COMPLIANT` → `COMPLIANT` · any `NON_COMPLIANT` → `NON_COMPLIANT` · all `INSUFFICIENT_EVIDENCE` → `INSUFFICIENT_EVIDENCE` · otherwise `PARTIALLY_COMPLIANT` |
+| `summary` | generated from the findings, so the counts are always right |
+
+**🛡️ Resilient structured output** — output is constrained through LangChain's `with_structured_output`, so the response is validated against the Pydantic schema **before it's ever returned**. `gpt-oss` on Groq sometimes breaks tool calling in two known ways: it names the tool `functions.ComplianceReport` instead of `ComplianceReport`, or it writes the JSON as plain text and Groq answers `400 tool_use_failed`. `_structured_output` reads the answer itself in both cases, retries once if the answer is unusable, and then raises the original error. Any other error (rate limit, network) is **not** hidden. Genuinely malformed output still fails loudly instead of silently passing bad data downstream.
 
 </details>
 
@@ -280,20 +321,22 @@ class Finding(BaseModel):
 
 
 class ComplianceReport(BaseModel):
-    status: ComplianceStatus # overall posture
-    summary: str             # 2-4 sentence overview
+    status: ComplianceStatus # overall posture (computed in code from the findings)
+    summary: str             # generated from the findings
     findings: list[Finding]
 ```
 
-> 🔎 **Every finding is traceable** back to a specific page and section of a specific document.
+> 🔎 **Every finding is traceable** back to a specific page and section of a specific document — and those fields come from the retrieved chunk that contains the quote, not from the LLM's own claim.
 
 ---
 
 ### 💬 Conversation Memory
 
-`ConversationBufferMemory` is injected into the reasoning prompt as `chat_history`, so **follow-up questions retain context** from earlier turns.
+`ConversationBufferMemory` still records every question and the summary of its report, but the history is **not sent to the LLM by default** (`USE_CHAT_HISTORY = False` in `config.py`). Old answers inside the prompt made the model drift between similar questions, so each analysis now sees only its own requirement and evidence.
 
-`refrech()` clears both the chunk stores and the memory — called when the user refreshes the page to start a clean session. 🔄
+The consequence: **write each follow-up as a self-contained question** (*"Does the Vendor NDA define Confidential Information broadly enough?"*, not *"and the NDA?"*). Set `USE_CHAT_HISTORY = True` to put the history back into the prompt.
+
+`refrech()` clears the chunk stores, the list of already-ingested documents and the memory — called when the user refreshes the page to start a clean session. 🔄
 
 ---
 
@@ -301,13 +344,13 @@ class ComplianceReport(BaseModel):
 
 ```
 ai_service/
-├── 🔧 config.py        # Env vars, LLM + embedding model init, constants
-├── ✂️  chunking.py      # Document → Chunk conversion (two strategies)
+├── 🔧 config.py        # Env vars, LLM + embedding model init, constants, retrieval settings
+├── ✂️  chunking.py      # Document → Chunk conversion (clause-level requirements, page-joined contracts)
 ├── 🧬 embeddings.py    # Text → vector encoding
 ├── 🔍 retriever.py     # FAISS similarity search
-├── 🧠 reasoning.py     # Query routing + LLM reasoning + prompts
+├── 🧠 reasoning.py     # Query routing + per-requirement LLM reasoning + report building
 ├── ⚙️  pipeline.py      # analyse() — orchestrates the full flow
-├── 🧪 demo.py          # Local test runner
+├── 🧪 demo.py          # Local test runner (with expected results for the sample documents)
 └── 📦 payload.json     # Sample input documents
 ```
 
@@ -372,11 +415,51 @@ for finding in report.findings:
 refrech()  # 🔄 clear session state
 ```
 
-> 💡 **Follow-up questions:** send an empty document list — previously indexed content is reused.
+> 💡 **Follow-up questions:** send an empty document list — previously indexed content is reused. Write the follow-up as a self-contained question, because the chat history is not sent to the LLM by default (see [Conversation Memory](#-conversation-memory)).
 >
 > ```python
-> report = analyse(query="What about the NDA?", files=Payload(documents=[]))
+> report = analyse(
+>     query="Is the Vendor NDA's definition of Confidential Information broad enough?",
+>     files=Payload(prompt="", documents=[]),
+> )
 > ```
+
+---
+
+### ⚙️ Configuration & Tuning
+
+Everything below is in `ai_service/code/config.py`.
+
+| Setting | Default | Meaning |
+|:---|:---:|:---|
+| `CHUNK_SIZE` · `CHUNK_OVERLAP` | `1000` · `150` | Contract chunking |
+| `REQ_PREFIX_TO_DOC` | `2→vendor_nda`, `3→terms_of_services`, `4→privacy_policy` | Which document type a requirement clause applies to. Clauses not listed apply to every document |
+| `MIN_REQ_SCORE` | `0.25` | Minimum cosine similarity between a topic and a requirement. Below it, the requirement is ignored — and if nothing passes, the report is `INSUFFICIENT_EVIDENCE` instead of a guess |
+| `REQ_REL_SCORE` | `0.70` | A requirement must reach this fraction of the best score found for the same topic |
+| `USE_CHAT_HISTORY` | `False` | Send the conversation history to the reasoning prompt |
+| `DEBUG_RETRIEVAL` | `False` | Print the top requirement scores of every query |
+
+**🎚️ Tuning the two score filters:** set `DEBUG_RETRIEVAL = True`, run `demo.py`, and read the scores. If a requirement you expect is missing, lower `REQ_REL_SCORE` (e.g. `0.6`). If unrelated requirements keep appearing, raise `MIN_REQ_SCORE` a little.
+
+**🧪 Expected results for the sample documents** *(the queries are in `demo.py`)*:
+
+| Query | Expected |
+|:---|:---|
+| NDA survival period + breach notification timeline | 🔴 both `NON_COMPLIANT` — 2 years (needs ≥ 3) and 5 business days (needs 24 hours) |
+| NDA definition of Confidential Information | 🟡 `PARTIALLY_COMPLIANT` — pricing/commercial terms and non-public financial information are not named |
+| Privacy Policy retention + international transfers | 🟢 both `COMPLIANT` — transfers are on page 2 |
+| ToS references the Privacy Policy | 🟢 `COMPLIANT` (ToS section 4, page 1) — the same answer however the question is worded |
+
+**📄 Requirements file format:** requirement chunks are created from numbered clauses (`2.4 Title`), `REQ-` ids and bullets. The clause filter is tuned to a rubric whose requirements are in sections **2–5**. If your requirements file is numbered differently, adjust `_REQ_KEEP_RE` in `chunking.py` and `REQ_PREFIX_TO_DOC` in `config.py`.
+
+---
+
+### ⚠️ Known Limitations
+
+- 📃 A chunk's page is the page where it **starts**. If the quoted sentence continues onto the next page, the reported page can be one lower.
+- 🔎 Broad questions (*"is the NDA compliant overall?"*) return only the top requirements per topic, not every clause.
+- 📊 If the PDF extraction cuts table cells, the LLM cannot see the full text of a table. This comes from `pdf_parser.py`, not from the AI service.
+- 🎚️ `MIN_REQ_SCORE` and `REQ_REL_SCORE` are starting values and depend on the embedding model — tune them on your own documents.
 
 ---
 
